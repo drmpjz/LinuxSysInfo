@@ -100,7 +100,8 @@ class NETinfo:
                             m = re.match('^\s+link/(ether|infiniband) (\w{2}:.*) brd', line)
                             if m:
                                 self.devices[dev]["SlaveList"][slaveDevice]["MAC"] = str.upper(m.group(2))
-        
+            else:
+                self.translateVendorID(dev, self.devices[dev])
 
 
         
@@ -155,13 +156,24 @@ class NETinfo:
             rootDict["Type"] = open('/sys/class/net/{0}/device/device'.format(dev), 'r').read().strip()
         except:
             rootDict["Type"] = "Network adaptor"    
-                    
+    
+    def translateVendorID(self, dev, rootDict):
+        vendorID = rootDict["VendorID"]
+        if vendorID.startswith("0x"):
+            vendorID  = vendorID[2:]
+        pciDB = open("/usr/share/hwdata/pci.ids", 'r')
+        for line in pciDB:
+            m = re.match('^{0}\s*(.*)$'.format(vendorID), line)
+            if m:
+                rootDict["VendorID"] = m.group(1)
+
+                        
     def __str__(self):
-        NETstring = "{0:6s}  {1:15s} {2:15s} {3:7s} {4:30s} {5:19s} {6:12s} {7:90s} {8}\n".format("Device", "IP Address", "Vendor",
+        NETstring = "{0:6s}  {1:15s} {2:20s} {3:7s} {4:30s} {5:25s} {6:12s} {7:90s} {8}\n".format("Device", "IP Address", "Vendor",
                                                                                                   "Driver", "Version", "FW", "PCI",          
                                                                                                   "Card", "Subsys")
         for device in self.devices:
-            NETstring = NETstring + "{0:6s}  {1:15s} {2:15s} {3:7s} {4:30s} {5:19s} {6:12s} {7:90s} {8}\n".format(device,
+            NETstring = NETstring + "{0:6s}  {1:15s} {2:20s} {3:7s} {4:30s} {5:25s} {6:12s} {7:90s} {8}\n".format(device,
                                                                      self.devices[device]["IPAdd"],
                                                                      self.devices[device]["VendorID"],
                                                                      self.devices[device]["Driver"],
@@ -174,7 +186,7 @@ class NETinfo:
             if device.startswith('bond'):
                 NETstring = NETstring + "    Active Slave: {0}\n".format(self.devices[device]["Active"])
                 for dev in self.devices[device]["SlaveList"]:
-                    NETstring = NETstring + "{0:6s} {1:15s} {2:15s} {3:7s} {4:30s} {5:19s} {6:12s} {7:90s} {8}\n".format(dev, 
+                    NETstring = NETstring + "{0:6s} {1:15s} {2:20s} {3:7s} {4:30s} {5:19s} {6:12s} {7:90s} {8}\n".format(dev, 
                                                                                   16*"-",
                                                                                   self.devices[device]["SlaveList"][dev].get("VendorID", 16*"-"),
                                                                                   self.devices[device]["SlaveList"][dev]["Driver"],

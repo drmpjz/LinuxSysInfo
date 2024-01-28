@@ -37,3 +37,7 @@ The scripts collected here address these issues, i.e.
 > Slots [0, 2] empty.  
 > Slots [1, 3] filled with Modules:  
 > 4 GB DDR3@1600 Ramaxel Technology RMR5030MN68F9F1600
+
+> ./netinfo.py 
+> Device  IP Address      Vendor               Driver  Version                        FW                        PCI          Card                                                                                       Subsys
+> eth0    10.0.7.37       Intel Corporation    igb     5.14.21-150500.53-default      1.59, 0x800008d2, 1.289.0 0000:02:00.0 Ethernet controller: Intel Corporation I350 Gigabit Network Connection (rev 01)            Hewlett-Packard Company Ethernet 1Gb 4-port 366i Adapter
