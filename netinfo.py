@@ -68,7 +68,8 @@ class NETinfo:
                 if ipAdd != "127.0.0.1":
                     self.devices[self.currDev]["IPAdd"] = ipAdd
                     self.getEthTool(self.currDev, cardDict, self.devices[self.currDev])
-                    self.getSysFS(self.currDev, self.devices[self.currDev])                    
+                    self.getSysFS(self.currDev, self.devices[self.currDev]) 
+                    self.getNUMA(self.currDev, self.devices[self.currDev])                  
                         
 #                   
 # Check (and potentially discard) final device
@@ -167,35 +168,41 @@ class NETinfo:
             if m:
                 rootDict["VendorID"] = m.group(1)
 
-                        
+    def getNUMA(self, dev, rootDict):
+        rootDict["NUMA"] = "--"
+        numaFile = '/sys/class/net/{0}/device/numa_device'.format(dev)
+        if os.path.isfile(numaFile):
+            with open(numaFile, 'r') as file:
+                rootDict["NUMA"] = file.read().rstrip()
+
     def __str__(self):
-        NETstring = "{0:6s}  {1:15s} {2:20s} {3:7s} {4:30s} {5:25s} {6:12s} {7:90s} {8}\n".format("Device", "IP Address", "Vendor",
-                                                                                                  "Driver", "Version", "FW", "PCI",          
+        outLayout = "{0:6s}  {1:15s} {2:20s} {3:7s} {4:30s} {5:25s} {6:4s} {7:12s} {8:90s} {9}\n"
+        NETstring = outLayout.format("Device", "IP Address", "Vendor",
+                                                                                                  "Driver", "Version", "FW", "NUMA", "PCI",          
                                                                                                   "Card", "Subsys")
         for device in self.devices:
-            NETstring = NETstring + "{0:6s}  {1:15s} {2:20s} {3:7s} {4:30s} {5:25s} {6:12s} {7:90s} {8}\n".format(device,
-                                                                     self.devices[device]["IPAdd"],
-                                                                     self.devices[device]["VendorID"],
-                                                                     self.devices[device]["Driver"],
-                                                                     self.devices[device]["Version"],
-                                                                     self.devices[device]["FW"],
-                                                                     self.devices[device]["PCI"],
-                                                                     self.devices[device]["Card"],
-                                                                     self.devices[device]["Subsys"]
+            NETstring = NETstring + outLayout.format(device, self.devices[device]["IPAdd"],
+                                                             self.devices[device]["VendorID"],
+                                                             self.devices[device]["Driver"],
+                                                             self.devices[device]["Version"],
+                                                             self.devices[device]["FW"],
+                                                             self.devices[device]["NUMA"],
+                                                             self.devices[device]["PCI"],
+                                                             self.devices[device]["Card"],
+                                                             self.devices[device]["Subsys"]
                                                                    )  
             if device.startswith('bond'):
                 NETstring = NETstring + "    Active Slave: {0}\n".format(self.devices[device]["Active"])
                 for dev in self.devices[device]["SlaveList"]:
-                    NETstring = NETstring + "{0:6s} {1:15s} {2:20s} {3:7s} {4:30s} {5:19s} {6:12s} {7:90s} {8}\n".format(dev, 
-                                                                                  16*"-",
-                                                                                  self.devices[device]["SlaveList"][dev].get("VendorID", 16*"-"),
-                                                                                  self.devices[device]["SlaveList"][dev]["Driver"],
-                                                                                  self.devices[device]["SlaveList"][dev]["Version"],
-                                                                                  self.devices[device]["SlaveList"][dev]["FW"],
-                                                                                  self.devices[device]["SlaveList"][dev]["PCI"],
-                                                                                  self.devices[device]["SlaveList"][dev]["Card"],
-                                                                                  self.devices[device]["SlaveList"][dev]["Subsys"]
-                                                                                  )
+                    NETstring = NETstring + outLayout.format(dev, 16*"-",
+                                                                  self.devices[device]["SlaveList"][dev].get("VendorID", 16*"-"),
+                                                                  self.devices[device]["SlaveList"][dev]["Driver"],
+                                                                  self.devices[device]["SlaveList"][dev]["Version"],
+                                                                  self.devices[device]["SlaveList"][dev]["FW"],
+                                                                  self.devices[device]["SlaveList"][dev]["PCI"],
+                                                                  self.devices[device]["SlaveList"][dev]["Card"],
+                                                                  self.devices[device]["SlaveList"][dev]["Subsys"]
+                                                            )
         NETstring = NETstring[:-1]
         return NETstring
 #
