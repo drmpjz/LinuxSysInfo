@@ -95,10 +95,11 @@ class NETinfo:
                         self.devices[dev]["SlaveList"][slaveDevice] = dict()
                         self.getEthTool(slaveDevice, cardDict, self.devices[dev]["SlaveList"][slaveDevice])
                         self.getSysFS(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
+                        self.getNUMA(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
                         p = subprocess.Popen('/sbin/ip addr show  ' + slaveDevice, shell=True,
                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                         for line in p.stdout.readlines():
-                            m = re.match('^\s+link/(ether|infiniband) (\w{2}:.*) brd', line)
+                            m = re.match('^\s+link/(ether|infiniband) (\w{2}:.*) brd', line.decode('ISO-8859-1'))
                             if m:
                                 self.devices[dev]["SlaveList"][slaveDevice]["MAC"] = str.upper(m.group(2))
             else:
@@ -199,6 +200,7 @@ class NETinfo:
                                                                   self.devices[device]["SlaveList"][dev]["Driver"],
                                                                   self.devices[device]["SlaveList"][dev]["Version"],
                                                                   self.devices[device]["SlaveList"][dev]["FW"],
+                                                                  self.devices[device]["SlaveList"][dev]["NUMA"],
                                                                   self.devices[device]["SlaveList"][dev]["PCI"],
                                                                   self.devices[device]["SlaveList"][dev]["Card"],
                                                                   self.devices[device]["SlaveList"][dev]["Subsys"]
