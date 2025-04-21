@@ -52,7 +52,7 @@ class MEMinfo:
                     if bankType == "RAM":
                        self.bankDict[bankNum]['speed'] = "N.A."
                        self.isVM = True
-            m=re.match('E: MEMORY_DEVICE_(.*)_CONFIGURED_SPEED_MTS=(.*)', line)
+            m=re.match('E: MEMORY_DEVICE_(.*?)_.*SPEED_MTS=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 if bankNum not in self.emptyList:
