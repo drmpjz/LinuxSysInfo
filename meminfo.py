@@ -90,13 +90,12 @@ class MEMinfo:
                 for key in refDict:
                     if refDict[key] != self.bankDict[bankNum][key]:
                         uniformMem = False
-        if uniformMem:
-            if len(self.bankDict) == 1:
-                 slot = "Slot"
-                 module = "Module"
-            else:
-                slot = "Slots"
-                module = "Modules"
+        if len(self.bankDict) == 1:
+            slot = "Slot"
+            module = "Module"
+        else:
+            slot = "Slots"
+            module = "Modules"
         if self.isVM:
             systemType = "Virtual Machine"
         else:
@@ -125,6 +124,7 @@ class MEMinfo:
                                                                                self.bankDict[bankNum]['vendor'],
                                                                                self.bankDict[bankNum]['vendorPart'],
                                                                                bankNum)
+            MEMstring = MEMstring.rstrip()    
         return MEMstring
 
 if __name__ == '__main__':
