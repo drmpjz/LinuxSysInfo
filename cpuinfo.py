@@ -1,6 +1,29 @@
 #!/usr/bin/env python3
 import re
 import glob
+from pathlib import Path
+
+
+def normMem(sizeByte, unitByte=""):
+    memUnit = ['B','kB', 'MB', 'GB', 'TB', 'PB']
+    if unitByte != "":
+        if unitByte == "KB":
+            unitByte = "kB"
+            unit = memUnit.index(unitByte)
+    else:
+        unit = 0
+    while sizeByte > 1024:
+        sizeByte = sizeByte / 1024
+        unit += 1
+    return round(sizeByte,1), memUnit[unit]
+
+def normFreq(inputkHz):
+    freqUnit = ['kHz', 'MHz', 'GHz']
+    unit = 0
+    while inputkHz > 1000:
+        inputkHz = inputkHz / 1000
+        unit +=1
+    return round(inputkHz,1), freqUnit[unit]
 
 class CPUinfo:
     def __init__(self):
@@ -10,7 +33,9 @@ class CPUinfo:
         logcpu = 0
         cores = set()
         siblings = set()
+        cSize = set()
         coreLayout = ""
+        maxkHz = set()
 
 
         raw = open('/proc/cpuinfo', 'r')
@@ -18,6 +43,9 @@ class CPUinfo:
             m = re.match('model name\s*:(.*)',item)
             if m:
                 model.add(m.group(1).strip())
+            m = re.match('cache size\s*:(.*)',item)
+            if m:
+                cSize.add(m.group(1).strip())
             m = re.match('processor\s*:(.*)', item)
             if m:
                 logcpu = max(logcpu, int(m.group(1)))
@@ -32,16 +60,38 @@ class CPUinfo:
                 coreLayout = coreLayout + m.group(1)    
 
         logcpu += 1
-        if len(model)*len(cores)*len(siblings) > 1:
+
+        checkCPU = 0
+
+        while checkCPU < logcpu:
+            sdPath = "/sys/devices/system/cpu/cpu{0}/cpufreq/scaling_max_freq".format(checkCPU)
+            checkCPU += 1
+            try:
+               maxkHz.add(Path(sdPath ).read_text().rstrip())
+            except:
+               maxkHz.add("Unknown")
+
+
+        if len(model)*len(cores)*len(siblings)*len(cSize) > 1:
             print("Non Standard Configuration with varying CPU characterics")
             print("Models:", model)
             print("Number of Logical CPUs:", logcpu) 
             print("Number of Cores", cores)
             print("Number of siblings", siblings)
+            print("Cache Size:", cSize)
             raise 
         self.model = ' '.join((model.pop()).split())
         self.logcpu = logcpu
         self.coreLayout = coreLayout.strip()
+        cRaw, cUnit = cSize.pop().split()
+        cNorm, cUnit = normMem(int(cRaw), cUnit)
+        self.l3Size = "{0} {1}".format(cNorm, cUnit)
+        rawMaxkHz = maxkHz.pop()
+        if rawMaxkHz != "Unknown":
+            freqMax, freqUnit = normFreq(int(rawMaxkHz))
+            self.freqMax = "{0} {1}".format(freqMax, freqUnit)
+        else:
+            self.freqMax = rawMaxkHz
         if len(cores) == 0: 
             self.cores = None
             self.ht = False
@@ -63,7 +113,7 @@ class CPUinfo:
 
 
     def __str__(self):
-        CPUstring = "System with {0} logical CPUs of type {1}\n".format(self.logcpu, self.model)
+        CPUstring = "System with {0} logical CPUs of type {1} (Max Frequency: {2}) with {3} Cache\n".format(self.logcpu, self.model, self.freqMax, self.l3Size)
         if self.cores:
             CPUstring = CPUstring + "with {0} cores each".format(self.cores)
         CPUstring = CPUstring + " on {0} socket(s)".format(self.sockets)
