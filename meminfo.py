@@ -25,7 +25,6 @@ class MEMinfo:
         raw = subprocess.Popen('udevadm info -e | grep -e MEMORY_DEVICE -e MEMORY_ARRAY', shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         for line in raw.stdout.readlines():
-            self.oldVer = ""
             line = line.decode()
             m = re.match('E: MEMORY_ARRAY_NUM_DEVICES=(.*)', line)
             if m:
@@ -68,7 +67,16 @@ class MEMinfo:
                 if bankNum not in self.emptyList:
                     self.bankDict[bankNum]['vendorPart'] = m.group(2).strip()
 
+        if len(self.bankDict) != 0:
+            self.oldVer = ""
 
+        if self.maxDIMM == 0 and self.oldVer == "":
+            self.maxDIMM = len(self.bankDict.keys()) + len(self.emptyList)
+# Hack since sometimes the information about the last bank is missing
+# and memory banks always come in two's....
+            if not self.isVM:
+                self.maxDIMM = self.maxDIMM + self.maxDIMM%2
+                self.emptyList.append(max(self.emptyList)+2)
 
     def __str__(self):
         totSize = 0

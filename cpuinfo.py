@@ -2,6 +2,7 @@
 import re
 import glob
 from pathlib import Path
+import subprocess
 
 
 def normMem(sizeByte, unitByte=""):
@@ -17,13 +18,17 @@ def normMem(sizeByte, unitByte=""):
         unit += 1
     return round(sizeByte,1), memUnit[unit]
 
-def normFreq(inputkHz):
+def normFreq(inputHz, unitHz=""):
     freqUnit = ['kHz', 'MHz', 'GHz']
-    unit = 0
-    while inputkHz > 1000:
-        inputkHz = inputkHz / 1000
+    if unitHz != "":
+        unit = freqUnit.index(unitHz)
+    else:
+        unit = 0
+    inputHz = float(inputHz)    
+    while inputHz > 1000:
+        inputHz = inputHz / 1000
         unit +=1
-    return round(inputkHz,1), freqUnit[unit]
+    return round(inputHz,1), freqUnit[unit]
 
 class CPUinfo:
     def __init__(self):
@@ -36,6 +41,7 @@ class CPUinfo:
         cSize = set()
         coreLayout = ""
         maxkHz = set()
+        self.freqBase = "Unknown"
 
 
         raw = open('/proc/cpuinfo', 'r')
@@ -71,6 +77,14 @@ class CPUinfo:
             except:
                maxkHz.add("Unknown")
 
+        dmesgPipe = subprocess.Popen(["dmesg"], stdout=subprocess.PIPE)
+
+        out, err = dmesgPipe.communicate()
+        m = re.match('(.*)tsc: Detected (.*?) processor', str(out))
+        if m:
+          inputHz, freqUnit = m.group(2).split()
+          normHz, freqUnit = normFreq(inputHz, freqUnit)
+          self.freqBase = "{0} {1}".format(normHz, freqUnit) 
 
         if len(model)*len(cores)*len(siblings)*len(cSize) > 1:
             print("Non Standard Configuration with varying CPU characterics")
@@ -113,7 +127,8 @@ class CPUinfo:
 
 
     def __str__(self):
-        CPUstring = "System with {0} logical CPUs of type {1} (Max Frequency: {2}) with {3} Cache\n".format(self.logcpu, self.model, self.freqMax, self.l3Size)
+        CPUstring = "System with {0} logical CPUs of type {1}\n(Base Frequency: {2} Max Frequency: {3}) with {4} Cache\n".format(
+                    self.logcpu, self.model, self.freqBase, self.freqMax, self.l3Size)
         if self.cores:
             CPUstring = CPUstring + "with {0} cores each".format(self.cores)
         CPUstring = CPUstring + " on {0} socket(s)".format(self.sockets)
