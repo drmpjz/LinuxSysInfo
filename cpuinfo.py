@@ -46,22 +46,22 @@ class CPUinfo:
 
         raw = open('/proc/cpuinfo', 'r')
         for item in raw:
-            m = re.match('model name\s*:(.*)',item)
+            m = re.match(r'model name\s*:(.*)',item)
             if m:
                 model.add(m.group(1).strip())
-            m = re.match('cache size\s*:(.*)',item)
+            m = re.match(r'cache size\s*:(.*)',item)
             if m:
                 cSize.add(m.group(1).strip())
-            m = re.match('processor\s*:(.*)', item)
+            m = re.match(r'processor\s*:(.*)', item)
             if m:
                 logcpu = max(logcpu, int(m.group(1)))
-            m = re.match('cpu cores\s*:(.*)', item)
+            m = re.match(r'cpu cores\s*:(.*)', item)
             if m:
                 cores.add(int(m.group(1)))      
-            m = re.match('siblings\s*:(.*)', item)
+            m = re.match(r'siblings\s*:(.*)', item)
             if m:
                 siblings.add(int(m.group(1)))   
-            m = re.match('physical id\s*:(.*)', item)
+            m = re.match(r'physical id\s*:(.*)', item)
             if m:
                 coreLayout = coreLayout + m.group(1)    
 
@@ -80,7 +80,7 @@ class CPUinfo:
         dmesgPipe = subprocess.Popen(["dmesg"], stdout=subprocess.PIPE)
 
         out, err = dmesgPipe.communicate()
-        m = re.match('(.*)tsc: Detected (.*?) processor', str(out))
+        m = re.match(r'(.*)tsc: Detected (.*?) processor', str(out))
         if m:
           inputHz, freqUnit = m.group(2).split()
           normHz, freqUnit = normFreq(inputHz, freqUnit)
