@@ -26,23 +26,23 @@ class MEMinfo:
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         for line in raw.stdout.readlines():
             line = line.decode()
-            m = re.match('E: MEMORY_ARRAY_NUM_DEVICES=(.*)', line)
+            m = re.match(r'E: MEMORY_ARRAY_NUM_DEVICES=(.*)', line)
             if m:
                 self.maxDIMM = int(m.group(1).strip())
-            m=re.match('E: MEMORY_ARRAY_MAX_CAPACITY=(.*)', line)
+            m=re.match(r'E: MEMORY_ARRAY_MAX_CAPACITY=(.*)', line)
             if m:
                 sizeByte = int(m.group(1).strip())
                 self.maxMem, self.maxUnit = normMem(sizeByte)
-            m=re.match('E: MEMORY_DEVICE_(.*)_PRESENT=0', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.*)_PRESENT=0', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 self.emptyList.append(bankNum)
-            m=re.match('E: MEMORY_DEVICE_(.\d*)_SIZE=(.*)', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.\d*)_SIZE=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 bankSize, bankUnit =  normMem( int(m.group(2).strip()))
                 self.bankDict[bankNum] = dict(size=bankSize, unit=bankUnit)
-            m=re.match('E: MEMORY_DEVICE_(.*)_TYPE=(.*)', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.*)_TYPE=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 if bankNum not in self.emptyList:
@@ -51,17 +51,17 @@ class MEMinfo:
                     if bankType == "RAM":
                        self.bankDict[bankNum]['speed'] = "N.A."
                        self.isVM = True
-            m=re.match('E: MEMORY_DEVICE_(.*?)_.*SPEED_MTS=(.*)', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.*?)_.*SPEED_MTS=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 if bankNum not in self.emptyList:
                     self.bankDict[bankNum]['speed'] = m.group(2).strip()
-            m=re.match('E: MEMORY_DEVICE_(.*)_MANUFACTURER=(.*)', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.*)_MANUFACTURER=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 if bankNum not in self.emptyList:
                     self.bankDict[bankNum]['vendor'] = m.group(2).strip()
-            m=re.match('E: MEMORY_DEVICE_(.*)_PART_NUMBER=(.*)', line)
+            m=re.match(r'E: MEMORY_DEVICE_(.*)_PART_NUMBER=(.*)', line)
             if m:
                 bankNum = int(m.group(1).strip())
                 if bankNum not in self.emptyList:

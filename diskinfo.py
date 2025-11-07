@@ -28,12 +28,12 @@ class DISKinfo:
         for line in raw.stdout.readlines():
             self.oldVer = ""
             line = line.decode()
-            m = re.match('NAME="(.*?)"', line)
+            m = re.match(r'NAME="(.*?)"', line)
             if m:
                 disk = m.group(1).strip()
                 self.diskDict[disk] = dict()
                 self.diskDict[disk]["hwRaid"] = "(N)"
-            m = re.match('.*SIZE="(.*?)"', line)
+            m = re.match(r'.*SIZE="(.*?)"', line)
             if m:
                 size = m.group(1).strip()
                 self.diskDict[disk]["size"] = size

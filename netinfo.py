@@ -32,18 +32,18 @@ class NETinfo:
         PCIbus = os.popen('/sbin/lspci -v', 'r')
         cardDict = dict()
         for line in PCIbus:
-            m = re.match('^(.*\w{2}\:\w{2}\.\d) (.*)\s*$', line)
+            m = re.match(r'^(.*\w{2}\:\w{2}\.\d) (.*)\s*$', line)
             if m:
                 slot = m.group(1)
                 Ctype = m.group(2)
                 cardDict[slot] = dict({"Card": Ctype})
-            m = re.match('^\s+Subsystem: (.*)\s*$', line)
+            m = re.match(r'^\s+Subsystem: (.*)\s*$', line)
             if m:
                 cardDict[slot]["Subsys"] = m.group(1)
 #
 # Sometimes Subsystem masquerades as DeviceName....
 #
-            m = re.match('^\s+DeviceName: (.*)\s*$', line)
+            m = re.match(r'^\s+DeviceName: (.*)\s*$', line)
             if m:
                 if cardDict[slot].get("Subsys", "") == "":
                     cardDict[slot]["Subsys"] = m.group(1)
@@ -58,15 +58,15 @@ class NETinfo:
         self.indent  = " "*3
 
         for item in raw:
-            m = re.match('^\d+: (.*):', item)
+            m = re.match(r'^\d+: (.*):', item)
             if m:
                 self.currDev = m.group(1)
                 self.devices[self.currDev] = dict()
                 self.devices[self.currDev]["IPAdd"] = "-"*15
-            m = re.match('^\s+link/(ether|infiniband) (\w{2}:.*) brd', item)
+            m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', item)
             if m:
                 self.devices[self.currDev]["MAC"] = str.upper(m.group(2))
-            m = re.match('^\s+inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}', item)
+            m = re.match(r'^\s+inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}', item)
             if m:
                 ipAdd = m.group(1)
                 self.devices[self.currDev]["IPAdd"] = ipAdd
@@ -96,16 +96,16 @@ class NETinfo:
                self.devices[dev]["BondType"] = ""
                bondInfo = open('/proc/net/bonding/{0}'.format(dev), 'r')
                for line in bondInfo:
-                   m = re.match('^802.3ad info', line)
+                   m = re.match(r'^802.3ad info', line)
                    if m:
                        self.devices[dev]["BondType"] = "LACP 802.3ad"
-                   m = re.match('Bonding Mode: fault-tolerance', line)
+                   m = re.match(r'Bonding Mode: fault-tolerance', line)
                    if m:
                        self.devices[dev]["BondType"] = "active-backup"
-                   m = re.match('^Currently Active Slave: (.*)$', line)
+                   m = re.match(r'^Currently Active Slave: (.*)$', line)
                    if m:
                        self.devices[dev]["Active"] = m.group(1)
-                   m = re.match('^Slave Interface: (.*)$', line) 
+                   m = re.match(r'^Slave Interface: (.*)$', line) 
                    if m:
                        slaveDevice = m.group(1)
                        self.globalSlaves.append(slaveDevice)
@@ -116,7 +116,7 @@ class NETinfo:
                        p = subprocess.Popen('/sbin/ip addr show  ' + slaveDevice, shell=True,
                                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                        for line in p.stdout.readlines():
-                           m = re.match('^\s+link/(ether|infiniband) (\w{2}:.*) brd', line.decode('ISO-8859-1'))
+                           m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', line.decode('ISO-8859-1'))
                            if m:
                                self.devices[dev]["SlaveList"][slaveDevice]["MAC"] = str.upper(m.group(2))
                        self.translateVendorID(slaveDevice,self.devices[dev]["SlaveList"][slaveDevice])
@@ -139,16 +139,16 @@ class NETinfo:
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         for line in p.stdout.readlines():
             line = line.decode()
-            m = re.match('^driver: (.*)$', line)
+            m = re.match(r'^driver: (.*)$', line)
             if m:
                 rootDict["Driver"] = m.group(1)
-            m = re.match('^version: (.*)$', line)
+            m = re.match(r'^version: (.*)$', line)
             if m:
                 rootDict["Version"] = m.group(1)
-            m = re.match('^firmware-version: (.*)$', line)
+            m = re.match(r'^firmware-version: (.*)$', line)
             if m:
                 rootDict["FW"] = m.group(1)
-            m = re.match('^bus-info: (.*)$', line)
+            m = re.match(r'^bus-info: (.*)$', line)
             if m:
                 rootDict["PCI"] = m.group(1)
                 for card in cardDict:
@@ -187,7 +187,7 @@ class NETinfo:
             vendorID  = vendorID[2:]
         pciDB = open("/usr/share/hwdata/pci.ids", 'r')
         for line in pciDB:
-            m = re.match('^{0}\s*(.*)$'.format(vendorID), line)
+            m = re.match(r'^{0}\s*(.*)$'.format(vendorID), line)
             if m:
                 rootDict["VendorID"] = m.group(1)
 

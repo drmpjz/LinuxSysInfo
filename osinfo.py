@@ -15,23 +15,23 @@ class OSinfo:
         self.OSversion = "Unknown"
         if os.path.isfile('/etc/os-release'):
             for line in open('/etc/os-release', 'r'):
-                m = re.match('^VERSION_ID\s*=\s*\"(.*)\"$', line)
+                m = re.match(r'^VERSION_ID\s*=\s*\"(.*)\"$', line)
                 if m:
                     self.OSversion = m.group(1)
-                m = re.match('^NAME\s*=\s*(.*)$', line)
+                m = re.match(r'^NAME\s*=\s*(.*)$', line)
                 if m:
                     self.OS = m.group(1)
         elif os.path.isfile('/etc/SuSE-release'):
             for line in open('/etc/SuSE-release', 'r'):
-                m = re.match('^VERSION = (.*)$', line)
+                m = re.match(r'^VERSION = (.*)$', line)
                 if m:
                     self.OSversion = m.group(1)
-                m = re.match('^(.*suse.*?)\s*\d*', line, re.IGNORECASE)
+                m = re.match(r'^(.*suse.*?)\s*\d*', line, re.IGNORECASE)
                 if m:
                     self.OS = m.group(1)
         elif os.path.isfile('/etc/redhat-release'):
             for line in open('/etc/redhat-release', 'r'):
-                m = re.match('^(.*?) Linux .* release (\d+\.\d+)', line, re.IGNORECASE)
+                m = re.match(r'^(.*?) Linux .* release (\d+\.\d+)', line, re.IGNORECASE)
                 if m:
                     self.OS = m.group(1)
                     self.OSversion = m.group(2)
@@ -41,7 +41,7 @@ class OSinfo:
             raw = subprocess.Popen('onload --version', shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             vstring = raw.stdout.readline()
-            self.TOE = vstring.strip()
+            self.TOE = (vstring.decode()).strip()
         except:
             self.TOE = None
     def __str__(self):
