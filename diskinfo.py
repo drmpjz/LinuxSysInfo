@@ -26,7 +26,6 @@ class DISKinfo:
         raw = subprocess.Popen('lsblk -P | grep TYPE| grep disk', shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         for line in raw.stdout.readlines():
-            self.oldVer = ""
             line = line.decode()
             m = re.match(r'NAME="(.*?)"', line)
             if m:
