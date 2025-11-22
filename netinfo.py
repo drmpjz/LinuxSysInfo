@@ -52,28 +52,28 @@ class NETinfo:
         raw = os.popen('/sbin/ip addr show', 'r')
 
         self.devices = dict()
-        self.globalSlaves = list()
         self.trunkDev = dict()
-        self.currDev = ""
-        self.indent  = " "*3
+
+        globalSlaves = list()
+        currDev = ""
 
         for item in raw:
             m = re.match(r'^\d+: (.*):', item)
             if m:
-                self.currDev = m.group(1)
-                self.devices[self.currDev] = dict()
-                self.devices[self.currDev]["IPAdd"] = "-"*15
+                currDev = m.group(1)
+                self.devices[currDev] = dict()
+                self.devices[currDev]["IPAdd"] = "-"*15
             m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', item)
             if m:
-                self.devices[self.currDev]["MAC"] = str.upper(m.group(2))
+                self.devices[currDev]["MAC"] = str.upper(m.group(2))
             m = re.match(r'^\s+inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}', item)
             if m:
                 ipAdd = m.group(1)
-                self.devices[self.currDev]["IPAdd"] = ipAdd
+                self.devices[currDev]["IPAdd"] = ipAdd
 
-            self.getEthTool(self.currDev, cardDict, self.devices[self.currDev])
-            self.getSysFS(self.currDev, self.devices[self.currDev]) 
-            self.getNUMA(self.currDev, self.devices[self.currDev])                  
+            self.getEthTool(currDev, cardDict, self.devices[currDev])
+            self.getSysFS(currDev, self.devices[currDev]) 
+            self.getNUMA(currDev, self.devices[currDev])                  
                         
 #                   
 # Remove loopback
@@ -108,7 +108,7 @@ class NETinfo:
                    m = re.match(r'^Slave Interface: (.*)$', line) 
                    if m:
                        slaveDevice = m.group(1)
-                       self.globalSlaves.append(slaveDevice)
+                       globalSlaves.append(slaveDevice)
                        self.devices[dev]["SlaveList"][slaveDevice] = dict()
                        self.getEthTool(slaveDevice, cardDict, self.devices[dev]["SlaveList"][slaveDevice])
                        self.getSysFS(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
@@ -122,6 +122,13 @@ class NETinfo:
                        self.translateVendorID(slaveDevice,self.devices[dev]["SlaveList"][slaveDevice])
             else:
                 self.translateVendorID(dev, self.devices[dev])
+
+#
+# Finally remove all slaveDevies from primary list (else they are twice enumerated)
+#
+
+        for dev in globalSlaves:
+            self.devices.pop(dev, None)
 
 #
 # Thought one could get biosdevname from /etc/systemd/network in case device was renamed
@@ -198,22 +205,23 @@ class NETinfo:
             with open(numaFile, 'r') as file:
                 rootDict["NUMA"] = file.read().rstrip()
 
-    def formatTrunk(self, dev, outString):
+    def formatTrunk(self, dev, outString, indent):
         vlanString = ""
         for vlanDev in sorted(self.trunkDev):
             if "@" + dev in vlanDev:
                 displayName, dummy = vlanDev.split("@")
                 vlanString = vlanString + "{0}: {1} ".format(displayName, self.trunkDev[vlanDev]["IPAdd"])
         if vlanString != "":
-            outString = outString + self.indent + vlanString + "\n"
+            outString = outString + indent + vlanString + "\n"
         return outString
 
     def __str__(self):
+        indent  = " "*3
         headLayout  = "{0:13s}  {1:15s} {2:25s} {3:10s} {4:30s} {5:27s} {6:4s} {7:12s}\n"
         slaveLayout = "{0:13s}  {1:9s} {2:25s} {3:10s} {4:30s} {5:27s} {6:4s} {7:12s}\n"
         cardLayout  = "{0:90s}\n{1}{2}\n"
         NETstring = headLayout.format("Device", "IP Address", "Vendor", "Driver", "Version", "FW", "NUMA", "PCI")
-        NETstring = NETstring + self.indent + cardLayout.format("Card", self.indent, "Subsys")
+        NETstring = NETstring + indent + cardLayout.format("Card", indent, "Subsys")
         for device in sorted(self.devices):
             if device.startswith('bond'):
                 NETstring = NETstring + headLayout.format(device, self.devices[device]["IPAdd"],
@@ -223,12 +231,12 @@ class NETinfo:
                                                                  self.devices[device]["FW"], 
                                                                  "", ""
                                                                  )
-                NETstring = NETstring + self.indent + "Bond Mode: {0}\n".format(self.devices[device]["BondType"])
+                NETstring = NETstring + indent + "Bond Mode: {0}\n".format(self.devices[device]["BondType"])
                 if self.devices[device]["BondType"] == "active-backup":
-                    NETstring = NETstring[:-1] + self.indent + "Active Slave: {0}\n".format(self.devices[device]["Active"])
-                NETstring = self.formatTrunk(device, NETstring)
+                    NETstring = NETstring[:-1] + indent + "Active Slave: {0}\n".format(self.devices[device]["Active"])
+                NETstring = self.formatTrunk(device, NETstring, indent)
                 for dev in self.devices[device]["SlaveList"]:
-                    NETstring = NETstring  + self.indent*2 + slaveLayout.format(dev, 9*"-",
+                    NETstring = NETstring  + indent*2 + slaveLayout.format(dev, 9*"-",
                                                                   self.devices[device]["SlaveList"][dev].get("VendorID", 16*"-"),
                                                                   self.devices[device]["SlaveList"][dev]["Driver"],
                                                                   self.devices[device]["SlaveList"][dev]["Version"],
@@ -236,12 +244,12 @@ class NETinfo:
                                                                   self.devices[device]["SlaveList"][dev]["NUMA"],
                                                                   self.devices[device]["SlaveList"][dev]["PCI"],
                                                            )
-                    NETstring = NETstring  + self.indent*3 + cardLayout.format(self.devices[device]["SlaveList"][dev]["Card"],
-                                                                  self.indent*3,                                                                   
+                    NETstring = NETstring  + indent*3 + cardLayout.format(self.devices[device]["SlaveList"][dev]["Card"],
+                                                                  indent*3,                                                                   
                                                                   self.devices[device]["SlaveList"][dev]["Subsys"]
                                                            )
     
-            elif device not in self.globalSlaves:
+            else:
                 NETstring = NETstring + headLayout.format(device, self.devices[device]["IPAdd"],
                                                                  self.devices[device]["VendorID"],
                                                                  self.devices[device]["Driver"],
@@ -250,9 +258,9 @@ class NETinfo:
                                                                  self.devices[device]["NUMA"],
                                                                  self.devices[device]["PCI"],
                                                                  )
-                NETstring = self.formatTrunk(device, NETstring)   
-                NETstring = NETstring  + self.indent + cardLayout.format(self.devices[device]["Card"],
-                                                                 self.indent,
+                NETstring = self.formatTrunk(device, NETstring, indent)   
+                NETstring = NETstring  + indent + cardLayout.format(self.devices[device]["Card"],
+                                                                 indent,
                                                                  self.devices[device]["Subsys"]
                                                                  )
         NETstring = NETstring[:-1]
