@@ -27,113 +27,129 @@ class NETinfo:
     macDict["00:07:43"] = "Chelsio"
     macDict["00:10:18"] = "Broadcom"
 
-    def __init__(self):
-    
-        PCIbus = os.popen('/sbin/lspci -v', 'r')
-        cardDict = dict()
-        for line in PCIbus:
-            m = re.match(r'^(.*\w{2}\:\w{2}\.\d) (.*)\s*$', line)
-            if m:
-                slot = m.group(1)
-                Ctype = m.group(2)
-                cardDict[slot] = dict({"Card": Ctype})
-            m = re.match(r'^\s+Subsystem: (.*)\s*$', line)
-            if m:
-                cardDict[slot]["Subsys"] = m.group(1)
-#
-# Sometimes Subsystem masquerades as DeviceName....
-#
-            m = re.match(r'^\s+DeviceName: (.*)\s*$', line)
-            if m:
-                if cardDict[slot].get("Subsys", "") == "":
-                    cardDict[slot]["Subsys"] = m.group(1)
-                         
-            
-        raw = os.popen('/sbin/ip addr show', 'r')
+    def __init__(self, loadData=None):
 
+#
+#  Initialize data fields
+#
         self.devices = dict()
         self.trunkDev = dict()
 
-        globalSlaves = list()
-        currDev = ""
+        if not loadData:
+#
+# Retrieve data from local machine
+#
 
-        for item in raw:
-            m = re.match(r'^\d+: (.*):', item)
-            if m:
-                currDev = m.group(1)
-                self.devices[currDev] = dict()
-                self.devices[currDev]["IPAdd"] = "-"*15
-            m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', item)
-            if m:
-                self.devices[currDev]["MAC"] = str.upper(m.group(2))
-            m = re.match(r'^\s+inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}', item)
-            if m:
-                ipAdd = m.group(1)
-                self.devices[currDev]["IPAdd"] = ipAdd
 
-            self.getEthTool(currDev, cardDict, self.devices[currDev])
-            self.getSysFS(currDev, self.devices[currDev]) 
-            self.getNUMA(currDev, self.devices[currDev])                  
+
+            PCIbus = os.popen('/sbin/lspci -v', 'r')
+            cardDict = dict()
+            for line in PCIbus:
+                m = re.match(r'^(.*\w{2}\:\w{2}\.\d) (.*)\s*$', line)
+                if m:
+                    slot = m.group(1)
+                    Ctype = m.group(2)
+                    cardDict[slot] = dict({"Card": Ctype})
+                m = re.match(r'^\s+Subsystem: (.*)\s*$', line)
+                if m:
+                    cardDict[slot]["Subsys"] = m.group(1)
+#
+# Sometimes Subsystem masquerades as DeviceName....
+#
+                m = re.match(r'^\s+DeviceName: (.*)\s*$', line)
+                if m:
+                    if cardDict[slot].get("Subsys", "") == "":
+                        cardDict[slot]["Subsys"] = m.group(1)
+                         
+            
+            raw = os.popen('/sbin/ip addr show', 'r')
+
+            globalSlaves = list()
+            currDev = ""
+
+            for item in raw:
+                m = re.match(r'^\d+: (.*):', item)
+                if m:
+                    currDev = m.group(1)
+                    self.devices[currDev] = dict()
+                    self.devices[currDev]["IPAdd"] = "-"*15
+                m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', item)
+                if m:
+                    self.devices[currDev]["MAC"] = str.upper(m.group(2))
+                m = re.match(r'^\s+inet (\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/\d{1,2}', item)
+                if m:
+                    ipAdd = m.group(1)
+                    self.devices[currDev]["IPAdd"] = ipAdd
+
+                self.getEthTool(currDev, cardDict, self.devices[currDev])
+                self.getSysFS(currDev, self.devices[currDev]) 
+                self.getNUMA(currDev, self.devices[currDev])                  
                         
 #                   
 # Remove loopback
 #
 
-        for dev in list(self.devices):
-            if self.devices[dev]["IPAdd"] == "127.0.0.1":        
-                self.devices.pop(dev, None)
-            if "@" in dev:
-                self.trunkDev[dev] = dict()
-                self.trunkDev[dev]["IPAdd"] = self.devices[dev]["IPAdd"]
-                self.devices.pop(dev, None)
+            for dev in list(self.devices):
+                if self.devices[dev]["IPAdd"] == "127.0.0.1":        
+                    self.devices.pop(dev, None)
+                if "@" in dev:
+                    self.trunkDev[dev] = dict()
+                    self.trunkDev[dev]["IPAdd"] = self.devices[dev]["IPAdd"]
+                    self.devices.pop(dev, None)
 
 #
 # Now remove loopback and check if we found any bonding devices
 #
-        for dev in self.devices:
-            if dev.startswith('bond'):
-               self.devices[dev]["SlaveList"] = dict()
-               self.devices[dev]["BondType"] = ""
-               bondInfo = open('/proc/net/bonding/{0}'.format(dev), 'r')
-               for line in bondInfo:
-                   m = re.match(r'^802.3ad info', line)
-                   if m:
-                       self.devices[dev]["BondType"] = "LACP 802.3ad"
-                   m = re.match(r'Bonding Mode: fault-tolerance', line)
-                   if m:
-                       self.devices[dev]["BondType"] = "active-backup"
-                   m = re.match(r'^Currently Active Slave: (.*)$', line)
-                   if m:
-                       self.devices[dev]["Active"] = m.group(1)
-                   m = re.match(r'^Slave Interface: (.*)$', line) 
-                   if m:
-                       slaveDevice = m.group(1)
-                       globalSlaves.append(slaveDevice)
-                       self.devices[dev]["SlaveList"][slaveDevice] = dict()
-                       self.getEthTool(slaveDevice, cardDict, self.devices[dev]["SlaveList"][slaveDevice])
-                       self.getSysFS(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
-                       self.getNUMA(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
-                       p = subprocess.Popen('/sbin/ip addr show  ' + slaveDevice, shell=True,
-                                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                       for line in p.stdout.readlines():
-                           m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', line.decode('ISO-8859-1'))
-                           if m:
-                               self.devices[dev]["SlaveList"][slaveDevice]["MAC"] = str.upper(m.group(2))
-                       self.translateVendorID(slaveDevice,self.devices[dev]["SlaveList"][slaveDevice])
-            else:
-                self.translateVendorID(dev, self.devices[dev])
+            for dev in self.devices:
+                if dev.startswith('bond'):
+                   self.devices[dev]["SlaveList"] = dict()
+                   self.devices[dev]["BondType"] = ""
+                   bondInfo = open('/proc/net/bonding/{0}'.format(dev), 'r')
+                   for line in bondInfo:
+                       m = re.match(r'^802.3ad info', line)
+                       if m:
+                           self.devices[dev]["BondType"] = "LACP 802.3ad"
+                       m = re.match(r'Bonding Mode: fault-tolerance', line)
+                       if m:
+                           self.devices[dev]["BondType"] = "active-backup"
+                       m = re.match(r'^Currently Active Slave: (.*)$', line)
+                       if m:
+                           self.devices[dev]["Active"] = m.group(1)
+                       m = re.match(r'^Slave Interface: (.*)$', line) 
+                       if m:
+                           slaveDevice = m.group(1)
+                           globalSlaves.append(slaveDevice)
+                           self.devices[dev]["SlaveList"][slaveDevice] = dict()
+                           self.getEthTool(slaveDevice, cardDict, self.devices[dev]["SlaveList"][slaveDevice])
+                           self.getSysFS(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
+                           self.getNUMA(slaveDevice, self.devices[dev]["SlaveList"][slaveDevice])
+                           p = subprocess.Popen('/sbin/ip addr show  ' + slaveDevice, shell=True,
+                                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                           for line in p.stdout.readlines():
+                               m = re.match(r'^\s+link/(ether|infiniband) (\w{2}:.*) brd', line.decode('ISO-8859-1'))
+                               if m:
+                                   self.devices[dev]["SlaveList"][slaveDevice]["MAC"] = str.upper(m.group(2))
+                           self.translateVendorID(slaveDevice,self.devices[dev]["SlaveList"][slaveDevice])
+                else:
+                    self.translateVendorID(dev, self.devices[dev])
 
 #
 # Finally remove all slaveDevies from primary list (else they are twice enumerated)
 #
 
-        for dev in globalSlaves:
-            self.devices.pop(dev, None)
+            for dev in globalSlaves:
+                self.devices.pop(dev, None)
 
 #
 # Thought one could get biosdevname from /etc/systemd/network in case device was renamed
 # but this is just a convention.
 #
+        else:
+#
+#  Re-create object from saved dictionary
+#
+            for key in vars(self):
+                setattr(self, key, loadData[key])
 
         
     def getEthTool(self, dev, cardDict, rootDict):
@@ -269,3 +285,10 @@ class NETinfo:
 if __name__ == '__main__':
     MyNet = NETinfo()
     print(MyNet)
+    if False:
+        netDict= dict(devices=dict(carrierPidgeon=dict(IPAdd='127.0.0.2', Card='', Subsys='', Driver="corn", 
+                      Version='08/15', FW='bird', 
+                      PCI='1.2.3', ModAlias='', PCIslot='1', uDriver='', VendorID='BirdHouse', Type='Bird transport',
+                      NUMA='2', MAC='Cheese')), trunkDev=dict())
+        loadNet = NETinfo(netDict)
+        print(loadNet)

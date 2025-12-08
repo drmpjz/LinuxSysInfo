@@ -31,99 +31,122 @@ def normFreq(inputHz, unitHz=""):
     return round(inputHz,1), freqUnit[unit]
 
 class CPUinfo:
-    def __init__(self):
+    def __init__(self, loadData=None):
+#
+#  Initialize data fields
+#
+        self.model      = "Unknown"
+        self.logcpu     = 0
+        self.coreLayout = "No Cores"
+        self.l3Size     = "Unknown"
+        self.freqMax    = "Unknown"
+        self.freqBase   = "Unknown"
+        self.cores      = None
+        self.ht         = False
+        self.sockets    = 1
+        self.numaCores  = [0]
 
-        numaCores = list()
-        model  = set()
-        logcpu = 0
-        cores = set()
-        siblings = set()
-        cSize = set()
-        coreLayout = ""
-        maxkHz = set()
-        self.freqBase = "Unknown"
+        if not loadData:
+#
+# Retrieve data from local machine
+#
+
+            numaCores = list()
+            model  = set()
+            logcpu = 0
+            cores = set()
+            siblings = set()
+            cSize = set()
+            coreLayout = ""
+            maxkHz = set()
 
 
-        raw = open('/proc/cpuinfo', 'r')
-        for item in raw:
-            m = re.match(r'model name\s*:(.*)',item)
+            raw = open('/proc/cpuinfo', 'r')
+            for item in raw:
+                m = re.match(r'model name\s*:(.*)',item)
+                if m:
+                    model.add(m.group(1).strip())
+                m = re.match(r'cache size\s*:(.*)',item)
+                if m:
+                    cSize.add(m.group(1).strip())
+                m = re.match(r'processor\s*:(.*)', item)
+                if m:
+                    logcpu = max(logcpu, int(m.group(1)))
+                m = re.match(r'cpu cores\s*:(.*)', item)
+                if m:
+                    cores.add(int(m.group(1)))      
+                m = re.match(r'siblings\s*:(.*)', item)
+                if m:
+                    siblings.add(int(m.group(1)))   
+                m = re.match(r'physical id\s*:(.*)', item)
+                if m:
+                    coreLayout = coreLayout + m.group(1)    
+
+            logcpu += 1
+
+            checkCPU = 0
+
+            while checkCPU < logcpu:
+                sdPath = "/sys/devices/system/cpu/cpu{0}/cpufreq/scaling_max_freq".format(checkCPU)
+                checkCPU += 1
+                try:
+                   maxkHz.add(Path(sdPath ).read_text().rstrip())
+                except:
+                   maxkHz.add("Unknown")
+
+            dmesgPipe = subprocess.Popen(["dmesg"], stdout=subprocess.PIPE)
+
+            out, err = dmesgPipe.communicate()
+            m = re.match(r'(.*)tsc: Detected (.*?) processor', str(out))
             if m:
-                model.add(m.group(1).strip())
-            m = re.match(r'cache size\s*:(.*)',item)
-            if m:
-                cSize.add(m.group(1).strip())
-            m = re.match(r'processor\s*:(.*)', item)
-            if m:
-                logcpu = max(logcpu, int(m.group(1)))
-            m = re.match(r'cpu cores\s*:(.*)', item)
-            if m:
-                cores.add(int(m.group(1)))      
-            m = re.match(r'siblings\s*:(.*)', item)
-            if m:
-                siblings.add(int(m.group(1)))   
-            m = re.match(r'physical id\s*:(.*)', item)
-            if m:
-                coreLayout = coreLayout + m.group(1)    
+                inputHz, freqUnit = m.group(2).split()
+                normHz, freqUnit = normFreq(inputHz, freqUnit)
+                self.freqBase = "{0} {1}".format(normHz, freqUnit) 
 
-        logcpu += 1
-
-        checkCPU = 0
-
-        while checkCPU < logcpu:
-            sdPath = "/sys/devices/system/cpu/cpu{0}/cpufreq/scaling_max_freq".format(checkCPU)
-            checkCPU += 1
-            try:
-               maxkHz.add(Path(sdPath ).read_text().rstrip())
-            except:
-               maxkHz.add("Unknown")
-
-        dmesgPipe = subprocess.Popen(["dmesg"], stdout=subprocess.PIPE)
-
-        out, err = dmesgPipe.communicate()
-        m = re.match(r'(.*)tsc: Detected (.*?) processor', str(out))
-        if m:
-          inputHz, freqUnit = m.group(2).split()
-          normHz, freqUnit = normFreq(inputHz, freqUnit)
-          self.freqBase = "{0} {1}".format(normHz, freqUnit) 
-
-        if len(model)*len(cores)*len(siblings)*len(cSize) > 1:
-            print("Non Standard Configuration with varying CPU characterics")
-            print("Models:", model)
-            print("Number of Logical CPUs:", logcpu) 
-            print("Number of Cores", cores)
-            print("Number of siblings", siblings)
-            print("Cache Size:", cSize)
-            raise 
-        self.model = ' '.join((model.pop()).split())
-        self.logcpu = logcpu
-        self.coreLayout = coreLayout.strip()
-        cRaw, cUnit = cSize.pop().split()
-        cNorm, cUnit = normMem(int(cRaw), cUnit)
-        self.l3Size = "{0} {1}".format(cNorm, cUnit)
-        rawMaxkHz = maxkHz.pop()
-        if rawMaxkHz != "Unknown":
-            freqMax, freqUnit = normFreq(int(rawMaxkHz))
-            self.freqMax = "{0} {1}".format(freqMax, freqUnit)
-        else:
-            self.freqMax = rawMaxkHz
-        if len(cores) == 0: 
-            self.cores = None
-            self.ht = False
-            self.sockets = self.logcpu
-        else:
-            self.cores =  cores.pop()
-            siblings = siblings.pop()
-            self.sockets = int(self.logcpu/max(self.cores, siblings))
-            if siblings > self.cores:
-                self.ht = True
+            if len(model)*len(cores)*len(siblings)*len(cSize) > 1:
+                print("Non Standard Configuration with varying CPU characterics")
+                print("Models:", model)
+                print("Number of Logical CPUs:", logcpu) 
+                print("Number of Cores", cores)
+                print("Number of siblings", siblings)
+                print("Cache Size:", cSize)
+                raise 
+            self.model = ' '.join((model.pop()).split())
+            self.logcpu = logcpu
+            self.coreLayout = coreLayout.strip()
+            cRaw, cUnit = cSize.pop().split()
+            cNorm, cUnit = normMem(int(cRaw), cUnit)
+            self.l3Size = "{0} {1}".format(cNorm, cUnit)
+            rawMaxkHz = maxkHz.pop()
+            if rawMaxkHz != "Unknown":
+                freqMax, freqUnit = normFreq(int(rawMaxkHz))
+                self.freqMax = "{0} {1}".format(freqMax, freqUnit)
             else:
-                self.ht = False   
+                self.freqMax = rawMaxkHz
+            if len(cores) == 0: 
+                self.cores = None
+                self.ht = False
+                self.sockets = self.logcpu
+            else:
+                self.cores =  cores.pop()
+                siblings = siblings.pop()
+                self.sockets = int(self.logcpu/max(self.cores, siblings))
+                if siblings > self.cores:
+                    self.ht = True
+                else:
+                    self.ht = False   
 
-        globList = glob.glob('/sys/devices/system/node/node*')
-        globList.sort()
-        for nodeDir in globList:
-            numaCores.append(open(nodeDir+'/cpulist', "r").read().strip())
-        self.numaCores = numaCores
+            globList = glob.glob('/sys/devices/system/node/node*')
+            globList.sort()
+            for nodeDir in globList:
+                numaCores.append(open(nodeDir+'/cpulist', "r").read().strip())
+            self.numaCores = numaCores
+        else:
+#
+#  Re-create object from saved dictionary
+#
+            for key in vars(self):
+                setattr(self, key, loadData[key])
 
 
     def __str__(self):
@@ -154,3 +177,8 @@ class CPUinfo:
 if __name__ == '__main__':
     MyCPU = CPUinfo()
     print(MyCPU)
+    if False:
+        cpuDict = dict(freqBase="1 Hz", model="Sumerian Claytablet", logcpu=2, coreLayout="0 1",
+                       l3Size="1 kB", freqMax="Unknown", cores=2, sockets=1, ht=False, numaCores=[0,1])
+        loadCPU = CPUinfo(cpuDict)
+        print(loadCPU)

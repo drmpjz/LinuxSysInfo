@@ -17,58 +17,74 @@ def normSize(sizeByte):
         unit += 1
     return int(sizeByte), memUnit[unit]
 
-class DISKinfo:
-    def __init__(self):
 
-        self.isVM = False
+
+class DISKinfo:
+    def __init__(self, loadData=None):
+
+#
+#  Initialize data fields
+#
+
         self.diskDict = dict()
 
-        raw = subprocess.Popen('lsblk -P | grep TYPE| grep disk', shell=True,
+        if not loadData:
+#
+# Retrieve data from local machine
+#
+
+            raw = subprocess.Popen('lsblk -P | grep TYPE| grep disk', shell=True,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for line in raw.stdout.readlines():
-            line = line.decode()
-            m = re.match(r'NAME="(.*?)"', line)
-            if m:
-                disk = m.group(1).strip()
-                self.diskDict[disk] = dict()
-                self.diskDict[disk]["hwRaid"] = "(N)"
-            m = re.match(r'.*SIZE="(.*?)"', line)
-            if m:
-                size = m.group(1).strip()
-                self.diskDict[disk]["size"] = size
-        
-        for disk in self.diskDict:
-            scPath = "/sys/class/block/{}/".format(disk)
+            for line in raw.stdout.readlines():
+                line = line.decode()
+                m = re.match(r'NAME="(.*?)"', line)
+                if m:
+                    disk = m.group(1).strip()
+                    self.diskDict[disk] = dict()
+                    self.diskDict[disk]["hwRaid"] = "(N)"
+                m = re.match(r'.*SIZE="(.*?)"', line)
+                if m:
+                    size = m.group(1).strip()
+                    self.diskDict[disk]["size"] = size
+          
+            for disk in self.diskDict:
+                scPath = "/sys/class/block/{}/".format(disk)
 #
 #           Size in /sys/class/block/<device>/size is in 512 byte blocks
 #
-            scSize = Path(scPath + "size").read_text().rstrip()
-            self.diskDict[disk]["blockTot"] = "{:.1e}".format(int(scSize))
-            try:
-                scVendor = Path(scPath + "device/vendor").read_text().rstrip()
-            except:
-                scVendor = "Unknown"
-            self.diskDict[disk]["Vendor"] = scVendor    
-            try:
-                scModel = Path(scPath + "device/model").read_text().rstrip()
-            except:
-                scModel = "Unknown"
-            self.diskDict[disk]["Model"] = scModel
+                scSize = Path(scPath + "size").read_text().rstrip()
+                self.diskDict[disk]["blockTot"] = "{:.1e}".format(int(scSize))
+                try:
+                    scVendor = Path(scPath + "device/vendor").read_text().rstrip()
+                except:
+                    scVendor = "Unknown"
+                self.diskDict[disk]["Vendor"] = scVendor    
+                try:
+                    scModel = Path(scPath + "device/model").read_text().rstrip()
+                except:
+                    scModel = "Unknown"
+                self.diskDict[disk]["Model"] = scModel
 #
 #          Guess raid controllers
 #
-            if ((self.diskDict[disk]["Vendor"] == "HPE" and self.diskDict[disk]["Model"] == "LOGICAL VOLUME") or
-                (self.diskDict[disk]["Vendor"] == "BROADCOM") or (self.diskDict[disk]["Vendor"] == "AVAGO")):
-               self.diskDict[disk]["hwRaid"] = "(Y)"
+                if ((self.diskDict[disk]["Vendor"] == "HPE" and self.diskDict[disk]["Model"] == "LOGICAL VOLUME") or
+                    (self.diskDict[disk]["Vendor"] == "BROADCOM") or (self.diskDict[disk]["Vendor"] == "AVAGO")):
+                    self.diskDict[disk]["hwRaid"] = "(Y)"
     
 #
 #           Guess disk vendors
 #
-            if self.diskDict[disk]["Vendor"] == "Unknown":
-                for vendor in unkVendor:
-                    if self.diskDict[disk]["Model"].startswith(vendor):
-                        self.diskDict[disk]["Vendor"] = unkVendor[vendor]
-                        self.diskDict[disk]["Model"] = self.diskDict[disk]["Model"][len(vendor):]
+                if self.diskDict[disk]["Vendor"] == "Unknown":
+                    for vendor in unkVendor:
+                        if self.diskDict[disk]["Model"].startswith(vendor):
+                           self.diskDict[disk]["Vendor"] = unkVendor[vendor]
+                           self.diskDict[disk]["Model"] = self.diskDict[disk]["Model"][len(vendor):]
+        else:
+#
+#  Re-create object from saved dictionary
+#
+            for key in vars(self):
+                setattr(self, key, loadData[key])
 
 
     def __str__(self):
@@ -88,3 +104,8 @@ class DISKinfo:
 if __name__ == '__main__':
     MyDISK = DISKinfo()
     print(MyDISK)
+    if False:
+        testDict = dict(diskDict=dict(World=dict(hwRaid="(N)", size="42P", blockTot="3.e+100", 
+                                                     Vendor="Turtle", Model="Magic")))
+        loadDisk = DISKinfo(testDict)
+        print(loadDisk)

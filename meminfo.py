@@ -12,8 +12,12 @@ def normMem(sizeByte):
     return int(sizeByte), memUnit[unit]
 
 class MEMinfo:
-    def __init__(self):
+    def __init__(self, loadData=None):
 
+#
+#  Initialize data fields
+#
+        
         self.maxDIMM = self.maxMem = 0
         self.maxUnit = ""
         self.emptyList = list()
@@ -21,62 +25,73 @@ class MEMinfo:
         self.isVM = False
         self.oldVer = "Old Linux release, memory information not yet supported by udevadm"
 
+        if not loadData:
+#
+# Retrieve data from local machine
+#
 
-        raw = subprocess.Popen('udevadm info -e | grep -e MEMORY_DEVICE -e MEMORY_ARRAY', shell=True,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        for line in raw.stdout.readlines():
-            line = line.decode()
-            m = re.match(r'E: MEMORY_ARRAY_NUM_DEVICES=(.*)', line)
-            if m:
-                self.maxDIMM = int(m.group(1).strip())
-            m=re.match(r'E: MEMORY_ARRAY_MAX_CAPACITY=(.*)', line)
-            if m:
-                sizeByte = int(m.group(1).strip())
-                self.maxMem, self.maxUnit = normMem(sizeByte)
-            m=re.match(r'E: MEMORY_DEVICE_(.*)_PRESENT=0', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                self.emptyList.append(bankNum)
-            m=re.match(r'E: MEMORY_DEVICE_(.\d*)_SIZE=(.*)', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                bankSize, bankUnit =  normMem( int(m.group(2).strip()))
-                self.bankDict[bankNum] = dict(size=bankSize, unit=bankUnit)
-            m=re.match(r'E: MEMORY_DEVICE_(.*)_TYPE=(.*)', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                if bankNum not in self.emptyList:
-                    bankType = m.group(2).strip()
-                    self.bankDict[bankNum]['type'] = bankType
-                    if bankType == "RAM":
-                       self.bankDict[bankNum]['speed'] = "N.A."
-                       self.isVM = True
-            m=re.match(r'E: MEMORY_DEVICE_(.*?)_.*SPEED_MTS=(.*)', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                if bankNum not in self.emptyList:
-                    self.bankDict[bankNum]['speed'] = m.group(2).strip()
-            m=re.match(r'E: MEMORY_DEVICE_(.*)_MANUFACTURER=(.*)', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                if bankNum not in self.emptyList:
-                    self.bankDict[bankNum]['vendor'] = m.group(2).strip()
-            m=re.match(r'E: MEMORY_DEVICE_(.*)_PART_NUMBER=(.*)', line)
-            if m:
-                bankNum = int(m.group(1).strip())
-                if bankNum not in self.emptyList:
-                    self.bankDict[bankNum]['vendorPart'] = m.group(2).strip()
+            raw = subprocess.Popen('udevadm info -e | grep -e MEMORY_DEVICE -e MEMORY_ARRAY', shell=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            for line in raw.stdout.readlines():
+                line = line.decode()
+                m = re.match(r'E: MEMORY_ARRAY_NUM_DEVICES=(.*)', line)
+                if m:
+                    self.maxDIMM = int(m.group(1).strip())
+                m=re.match(r'E: MEMORY_ARRAY_MAX_CAPACITY=(.*)', line)
+                if m:
+                    sizeByte = int(m.group(1).strip())
+                    self.maxMem, self.maxUnit = normMem(sizeByte)
+                m=re.match(r'E: MEMORY_DEVICE_(.*)_PRESENT=0', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    self.emptyList.append(bankNum)
+                m=re.match(r'E: MEMORY_DEVICE_(.\d*)_SIZE=(.*)', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    bankSize, bankUnit =  normMem( int(m.group(2).strip()))
+                    self.bankDict[bankNum] = dict(size=bankSize, unit=bankUnit)
+                m=re.match(r'E: MEMORY_DEVICE_(.*)_TYPE=(.*)', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    if bankNum not in self.emptyList:
+                        bankType = m.group(2).strip()
+                        self.bankDict[bankNum]['type'] = bankType
+                        if bankType == "RAM":
+                           self.bankDict[bankNum]['speed'] = "N.A."
+                           self.isVM = True
+                m=re.match(r'E: MEMORY_DEVICE_(.*?)_.*SPEED_MTS=(.*)', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    if bankNum not in self.emptyList:
+                        self.bankDict[bankNum]['speed'] = m.group(2).strip()
+                m=re.match(r'E: MEMORY_DEVICE_(.*)_MANUFACTURER=(.*)', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    if bankNum not in self.emptyList:
+                        self.bankDict[bankNum]['vendor'] = m.group(2).strip()
+                m=re.match(r'E: MEMORY_DEVICE_(.*)_PART_NUMBER=(.*)', line)
+                if m:
+                    bankNum = int(m.group(1).strip())
+                    if bankNum not in self.emptyList:
+                        self.bankDict[bankNum]['vendorPart'] = m.group(2).strip()
 
-        if len(self.bankDict) != 0:
-            self.oldVer = ""
+            if len(self.bankDict) != 0:
+                self.oldVer = ""
 
-        if self.maxDIMM == 0 and self.oldVer == "":
-            self.maxDIMM = len(self.bankDict.keys()) + len(self.emptyList)
+            if self.maxDIMM == 0 and self.oldVer == "":
+                self.maxDIMM = len(self.bankDict.keys()) + len(self.emptyList)
 # Hack since sometimes the information about the last bank is missing
 # and memory banks always come in two's....
-            if not self.isVM:
-                self.maxDIMM = self.maxDIMM + self.maxDIMM%2
-                self.emptyList.append(max(self.emptyList)+2)
+                if not self.isVM:
+                    self.maxDIMM = self.maxDIMM + self.maxDIMM%2
+                    self.emptyList.append(max(self.emptyList)+2)
+        else:
+#
+#  Re-create object from saved dictionary
+#
+            for key in vars(self):
+                setattr(self, key, loadData[key])
+
 
     def __str__(self):
         totSize = 0
@@ -138,3 +153,10 @@ class MEMinfo:
 if __name__ == '__main__':
     MyMEM = MEMinfo()
     print(MyMEM)
+    if False:
+        memDict = dict(maxDIMM=4, maxMem=2.71, maxUnit="PB", emptyList=[1,2,3], isVM=False, oldVer="")
+        memDict["bankDict"] = dict()
+        memDict["bankDict"][0]=dict(size=1, unit="TB", type="USSR2", speed="ludicrous",
+                                            vendor="Brooks", vendorPart="1")
+        loadMem = MEMinfo(memDict)
+        print(loadMem)
